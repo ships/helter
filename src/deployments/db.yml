@@ -1,0 +1,68 @@
+---
+name: db
+
+releases:
+- name: postgres
+  version: latest
+- name: consul
+  version: latest
+
+stemcells:
+- alias: default
+  os: ubuntu-xenial
+  version: latest
+
+instance_groups:
+- name:      postgres
+  instances: 1
+  azs:       [z1]
+  vm_type:   default
+  stemcell:  default
+  persistent_disk_type: large
+
+  networks:
+  - name: bridge
+
+  jobs:
+  - name: postgres
+    release: postgres
+    properties:
+      databases:
+        databases:
+        - name: concourse
+          citext: true
+        roles:
+        - name: pgadmin
+          password: ((admin_user.password))
+  - name: consul
+    release: consul
+    properties:
+      consul:
+        server: false
+        datacenter: yao
+        domain: skelter
+        services:
+          postgres:
+            tags: [db, bosh]
+            port: 5432
+            checks:
+            - id: pg_tcp
+              name: postgres port listening for tcp
+              tcp: localhost:5432
+              interval: 30s
+              timeout: 3s
+    consumes:
+      consul_servers: {from: consul, deployment: raft}
+
+variables:
+- name: admin_user
+  type: user
+  options:
+    username: pgadmin
+
+update:
+  canaries:          0
+  max_in_flight:     1
+  serial:            true
+  canary_watch_time: 1000-120000
+  update_watch_time: 1000-120000

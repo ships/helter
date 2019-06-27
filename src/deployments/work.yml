@@ -1,0 +1,107 @@
+---
+name: work
+
+releases:
+- name: consul
+  version: latest
+- name: nomad
+  version: latest
+- name: docker
+  version: latest
+
+stemcells:
+- alias: default
+  os: ubuntu-xenial
+  version: latest
+
+update:
+  canaries: 0
+  max_in_flight: 1
+  canary_watch_time: 5000-180000
+  update_watch_time: 5000-180000
+
+instance_groups:
+- name: carrack
+  azs: [z1]
+  instances: 2
+  jobs:
+  - name: docker
+    release: docker
+  - name: nomad-client
+    release: nomad
+    consumes:
+      nomad_servers: {from: nomad, deployment: raft}
+    properties:
+      nomad:
+        encrypt: ((/bosh-lite/raft/nomad_encryption_key))
+        datacenter: carthage
+        region: yao
+        log_level: DEBUG
+        # ssl_ca: ((nomad_tls.ca))
+        # ssl_cert: ((nomad_tls.certificate))
+        # ssl_key: ((nomad_tls.private_key))
+        docker:
+          privileged: true
+        vault:
+          address: https://active.vault.service.skelter:443
+          ssl_ca: ((nomad_vault_client_tls.ca))
+          ssl_cert: ((nomad_vault_client_tls.certificate))
+          ssl_key: ((nomad_vault_client_tls.private_key))
+        # consul:
+        #   ssl_ca: ((nomad_consul_client_tls.ca))
+        #   ssl_cert: ((nomad_consul_client_tls.certificate))
+        #   ssl_key: ((nomad_consul_client_tls.private_key))
+  - name: consul
+    release: consul
+    properties:
+      consul:
+        datacenter: yao
+        domain: skelter
+        server: false
+        # http_local: true
+        # ssl_ca: ((consul_cluster_tls.ca))
+        # ssl_cert: ((consul_cluster_tls.certificate))
+        # ssl_key: ((consul_cluster_tls.private_key))
+        # verify_incoming: false
+    consumes:
+      consul_servers: { from: consul, deployment: raft }
+  vm_type: large
+  stemcell: default
+  persistent_disk: 102400
+  networks:
+  - name: bridge
+
+variables:
+# variables:
+# - name: /pki/mtls_cas/nomad_ca
+#   type: certificate
+#   options:
+#     common_name: nomad cluster CA (shared with clients)
+#     is_ca: true
+#     ca: /pki/root_ca
+# - name: nomad_tls
+#   type: certificate
+#   options:
+#     common_name: Nomad cluster inter-TLS
+#     alternative_names: []
+#     ca: /pki/mtls_cas/nomad_ca
+- name: nomad_vault_client_tls
+  type: certificate
+  options:
+    common_name: Nomad connecting to vault as client
+    ca: /pki/mtls_cas/vault_ca
+- name: consul_cluster_tls
+  type: certificate
+  options:
+    common_name: Consul cluster comms TLS
+    alternative_names:
+    - consul.service.skelter
+    - localhost
+    - 127.0.0.1
+    ca: /pki/mtls_cas/consul_ca
+- name: nomad_consul_client_tls
+  type: certificate
+  options:
+    common_name: Nomad connecting to Consul as client
+    ca: /pki/mtls_cas/consul_ca
+
