@@ -1,0 +1,502 @@
+cloud_provider:
+  cert: ((mbus_bootstrap_ssl))
+  mbus: https://mbus:((mbus_bootstrap_password))@192.168.1.20:6868
+  properties:
+    agent:
+      mbus: https://mbus:((mbus_bootstrap_password))@0.0.0.0:6868
+    blobstore:
+      path: /var/vcap/micro_bosh/data/cache
+      provider: local
+    ntp:
+    - time1.google.com
+    - time2.google.com
+    - time3.google.com
+    - time4.google.com
+  template:
+    name: virtualbox_cpi
+    release: bosh-virtualbox-cpi
+disk_pools:
+- disk_size: 65536
+  name: disks
+instance_groups:
+- instances: 1
+  jobs:
+  - name: bpm
+    release: bpm
+  - name: nats
+    release: bosh
+  - name: postgres-10
+    release: bosh
+  - name: blobstore
+    release: bosh
+  - name: director
+    release: bosh
+  - name: health_monitor
+    release: bosh
+  - name: virtualbox_cpi
+    properties:
+      agent:
+        mbus: nats://nats:((nats_password))@192.168.1.20:4222
+      blobstore:
+        address: 192.168.1.20
+        agent:
+          password: ((blobstore_agent_password))
+          user: agent
+        port: 25250
+        provider: dav
+      host: ((vbox_host))
+      ntp:
+      - 0.pool.ntp.org
+      - 1.pool.ntp.org
+      private_key: ((vbox_ssh.private_key))
+      username: ((vbox_username))
+    release: bosh-virtualbox-cpi
+  - name: uaa
+    properties:
+      encryption:
+        active_key_label: uaa-encryption-key-1
+        encryption_keys:
+        - label: uaa-encryption-key-1
+          passphrase: ((uaa_encryption_key_1))
+      login:
+        saml:
+          activeKeyId: uaa-saml-key-1
+          keys:
+            uaa-saml-key-1:
+              certificate: ((uaa_service_provider_ssl.certificate))
+              key: ((uaa_service_provider_ssl.private_key))
+              passphrase: ""
+      uaa:
+        clients:
+          admin:
+            authorities: bosh.admin
+            authorized-grant-types: client_credentials
+            override: true
+            scope: ""
+            secret: ((admin_password))
+          bosh_cli:
+            access-token-validity: 120
+            authorities: uaa.none
+            authorized-grant-types: password,refresh_token
+            override: true
+            refresh-token-validity: 86400
+            scope: openid,bosh.admin,bosh.read,bosh.*.admin,bosh.*.read,bosh.teams.*.admin,bosh.teams.*.read
+            secret: ""
+          credhub-admin:
+            access-token-validity: 3600
+            authorities: credhub.read,credhub.write
+            authorized-grant-types: client_credentials
+            override: true
+            scope: ""
+            secret: ((credhub_admin_client_secret))
+          credhub_cli:
+            access-token-validity: 60
+            authorities: ""
+            authorized-grant-types: password,refresh_token
+            override: true
+            refresh-token-validity: 1800
+            scope: credhub.read,credhub.write
+            secret: ""
+          director_to_credhub:
+            access-token-validity: 3600
+            authorities: credhub.read,credhub.write
+            authorized-grant-types: client_credentials
+            override: true
+            scope: ""
+            secret: ((uaa_clients_director_to_credhub))
+          hm:
+            authorities: bosh.admin
+            authorized-grant-types: client_credentials
+            override: true
+            scope: ""
+            secret: ((hm_password))
+          uaa_admin:
+            authorities: clients.read,clients.write,clients.secret,uaa.admin,scim.read,scim.write,password.write
+            authorized-grant-types: client_credentials
+            override: true
+            scope: ""
+            secret: ((uaa_admin_client_secret))
+        jwt:
+          policy:
+            active_key_id: uaa-jwt-key-1
+            keys:
+              uaa-jwt-key-1:
+                signingKey: ((uaa_jwt_signing_key.private_key))
+          revocable: true
+        login:
+          client_secret: ((uaa_login_client_secret))
+        port: -1
+        scim:
+          groups:
+            bosh.admin: User has admin access on any Director
+            bosh.read: User has read access on any Director
+            bosh.releases.upload: User can upload new releases
+            bosh.stemcells.upload: User can upload new stemcells
+          users:
+          - groups:
+            - bosh.admin
+            name: admin
+            password: ((admin_password))
+          - groups:
+            - credhub.read
+            - credhub.write
+            name: credhub_cli_user
+            password: ((credhub_cli_user_password))
+        sslCertificate: ((uaa_ssl.certificate))
+        sslPrivateKey: ((uaa_ssl.private_key))
+        url: https://192.168.1.20:8443
+        zones:
+          internal:
+            hostnames: []
+      uaadb:
+        address: 127.0.0.1
+        databases:
+        - name: uaa
+          tag: uaa
+        db_scheme: postgresql
+        port: 5432
+        roles:
+        - name: postgres
+          password: ((postgres_password))
+          tag: admin
+    release: uaa
+  - name: credhub
+    properties:
+      credhub:
+        authentication:
+          uaa:
+            ca_certs:
+            - ((uaa_ssl.ca))
+            url: https://192.168.1.20:8443
+            verification_key: ((uaa_jwt_signing_key.public_key))
+        authorization:
+          acls:
+            enabled: false
+        data_storage:
+          database: credhub
+          host: 127.0.0.1
+          password: ((postgres_password))
+          port: 5432
+          require_tls: false
+          type: postgres
+          username: postgres
+        encryption:
+          keys:
+          - active: true
+            key_properties:
+              encryption_password: ((credhub_encryption_password))
+            provider_name: internal
+          providers:
+          - name: internal
+            type: internal
+        tls: ((credhub_tls))
+    release: credhub
+  - name: bbr-credhubdb
+    properties:
+      credhub:
+        data_storage:
+          database: credhub
+          host: 127.0.0.1
+          password: ((postgres_password))
+          port: 5432
+          require_tls: false
+          type: postgres
+          username: postgres
+      release_level_backup: true
+    release: credhub
+  - name: user_add
+    properties:
+      users:
+      - name: jumpbox
+        public_key: ((jumpbox_ssh.public_key))
+    release: os-conf
+  name: bosh
+  networks:
+  - default:
+    - dns
+    - gateway
+    name: default
+    static_ips:
+    - 192.168.1.20
+  persistent_disk_pool: disks
+  properties:
+    agent:
+      env:
+        bosh:
+          blobstores:
+          - options:
+              endpoint: https://192.168.1.20:25250
+              password: ((blobstore_agent_password))
+              tls:
+                cert:
+                  ca: ((blobstore_ca.certificate))
+              user: agent
+            provider: dav
+      mbus: nats://nats:((nats_password))@192.168.1.20:4222
+    blobstore:
+      address: 192.168.1.20
+      agent:
+        password: ((blobstore_agent_password))
+        user: agent
+      director:
+        password: ((blobstore_director_password))
+        user: director
+      port: 25250
+      provider: dav
+      tls:
+        cert:
+          ca: ((blobstore_ca.certificate))
+          certificate: ((blobstore_server_tls.certificate))
+          private_key: ((blobstore_server_tls.private_key))
+    director:
+      address: 127.0.0.1
+      config_server:
+        ca_cert: ((credhub_tls.ca))
+        enabled: true
+        uaa:
+          ca_cert: ((uaa_ssl.ca))
+          client_id: director_to_credhub
+          client_secret: ((uaa_clients_director_to_credhub))
+          url: https://192.168.1.20:8443
+        url: https://192.168.1.20:8844/api/
+      cpi_job: virtualbox_cpi
+      db:
+        adapter: postgres
+        database: bosh
+        host: 127.0.0.1
+        listen_address: 127.0.0.1
+        password: ((postgres_password))
+        user: postgres
+      default_ssh_options:
+        gateway_user: jumpbox
+      enable_dedicated_status_worker: true
+      enable_nats_delivered_templates: true
+      enable_post_deploy: true
+      events:
+        record_events: true
+      flush_arp: true
+      generate_vm_passwords: true
+      local_dns:
+        enabled: true
+      name: bosh-lite
+      ssl:
+        cert: ((director_ssl.certificate))
+        key: ((director_ssl.private_key))
+      user_management:
+        provider: uaa
+        uaa:
+          public_key: ((uaa_jwt_signing_key.public_key))
+          url: https://192.168.1.20:8443
+      workers: 4
+    hm:
+      director_account:
+        ca_cert: ((director_ssl.ca))
+        client_id: hm
+        client_secret: ((hm_password))
+        password: ((hm_password))
+        user: hm
+      resurrector_enabled: true
+    nats:
+      address: 192.168.1.20
+      password: ((nats_password))
+      tls:
+        ca: ((nats_server_tls.ca))
+        client_ca:
+          certificate: ((nats_ca.certificate))
+          private_key: ((nats_ca.private_key))
+        director:
+          certificate: ((nats_clients_director_tls.certificate))
+          private_key: ((nats_clients_director_tls.private_key))
+        health_monitor:
+          certificate: ((nats_clients_health_monitor_tls.certificate))
+          private_key: ((nats_clients_health_monitor_tls.private_key))
+        server:
+          certificate: ((nats_server_tls.certificate))
+          private_key: ((nats_server_tls.private_key))
+      user: nats
+    ntp:
+    - time1.google.com
+    - time2.google.com
+    - time3.google.com
+    - time4.google.com
+    postgres:
+      adapter: postgres
+      additional_databases:
+      - uaa
+      - credhub
+      database: bosh
+      host: 127.0.0.1
+      listen_address: 127.0.0.1
+      password: ((postgres_password))
+      user: postgres
+  resource_pool: vms
+name: bosh
+networks:
+- name: default
+  subnets:
+  - dns:
+    - 8.8.8.8
+    gateway: 192.168.1.254
+    range: 192.168.1.0/24
+    cloud_properties: {name: eno1, type: bridged}
+    static:
+    - 192.168.1.20
+  type: manual
+releases:
+- name: bosh
+  sha1: 0d014bedc7e058246cad976cf2d6b6d3eb971a08
+  url: https://s3.amazonaws.com/bosh-compiled-release-tarballs/bosh-270.1.1-ubuntu-xenial-315.36-20190607-144612-349254819-20190607144619.tgz
+  version: 270.1.1
+- name: bpm
+  sha1: f3ee3883008388eb313014c94966558eb0ad2480
+  url: https://s3.amazonaws.com/bosh-compiled-release-tarballs/bpm-1.1.0-ubuntu-xenial-315.36-20190610-155244-17035177-20190610155251.tgz
+  version: 1.1.0
+- name: bosh-virtualbox-cpi
+  url: file:///home/horse/helter/src/vbox-release-wip.tgz
+- name: uaa
+  sha1: cf96cc6415c7d76b1ea4bf86db97a56ccfe0394b
+  url: https://s3.amazonaws.com/bosh-compiled-release-tarballs/uaa-64.0-ubuntu-xenial-315.36-20190614-204523-899427425-20190614204537.tgz
+  version: 64
+- name: credhub
+  sha1: 1e7f85d2919b27d48107dc964b278a62b8d8ddab
+  url: https://s3.amazonaws.com/bosh-compiled-release-tarballs/credhub-2.4.0-ubuntu-xenial-315.36-20190607-144232-848883329-20190607144238.tgz
+  version: 2.4.0
+- name: os-conf
+  sha1: 78d79f08ff5001cc2a24f572837c7a9c59a0e796
+  url: https://bosh.io/d/github.com/cloudfoundry/os-conf-release?v=18
+  version: 18
+resource_pools:
+- cloud_properties:
+    cpus: 1
+    ephemeral_disk: 16384
+    memory: 2048
+  env:
+    bosh:
+      mbus:
+        cert: ((mbus_bootstrap_ssl))
+      password: '*'
+  name: vms
+  network: default
+  stemcell:
+    sha1: e9a684a336166ae7f588ab74c8795865de33410c
+    url: https://s3.amazonaws.com/bosh-core-stemcells/315.36/bosh-stemcell-315.36-vsphere-esxi-ubuntu-xenial-go_agent.tgz
+variables:
+- name: admin_password
+  type: password
+- name: blobstore_director_password
+  type: password
+- name: blobstore_agent_password
+  type: password
+- name: hm_password
+  type: password
+- name: mbus_bootstrap_password
+  type: password
+- name: nats_password
+  type: password
+- name: postgres_password
+  type: password
+- name: default_ca
+  options:
+    common_name: ca
+    is_ca: true
+  type: certificate
+- name: mbus_bootstrap_ssl
+  options:
+    alternative_names:
+    - 192.168.1.20
+    ca: default_ca
+    common_name: 192.168.1.20
+  type: certificate
+- name: director_ssl
+  options:
+    alternative_names:
+    - 192.168.1.20
+    ca: default_ca
+    common_name: 192.168.1.20
+  type: certificate
+- name: nats_ca
+  options:
+    common_name: default.nats-ca.bosh-internal
+    is_ca: true
+  type: certificate
+- name: nats_server_tls
+  options:
+    alternative_names:
+    - 192.168.1.20
+    ca: nats_ca
+    common_name: default.nats.bosh-internal
+    extended_key_usage:
+    - server_auth
+  type: certificate
+- name: nats_clients_director_tls
+  options:
+    ca: nats_ca
+    common_name: default.director.bosh-internal
+    extended_key_usage:
+    - client_auth
+  type: certificate
+- name: nats_clients_health_monitor_tls
+  options:
+    ca: nats_ca
+    common_name: default.hm.bosh-internal
+    extended_key_usage:
+    - client_auth
+  type: certificate
+- name: blobstore_ca
+  options:
+    common_name: default.blobstore-ca.bosh-internal
+    is_ca: true
+  type: certificate
+- name: blobstore_server_tls
+  options:
+    alternative_names:
+    - 192.168.1.20
+    ca: blobstore_ca
+    common_name: 192.168.1.20
+  type: certificate
+- name: uaa_jwt_signing_key
+  type: rsa
+- name: uaa_admin_client_secret
+  type: password
+- name: uaa_login_client_secret
+  type: password
+- name: uaa_encryption_key_1
+  type: password
+- name: uaa_ssl
+  options:
+    alternative_names:
+    - 192.168.1.20
+    ca: default_ca
+    common_name: 192.168.1.20
+  type: certificate
+- name: uaa_service_provider_ssl
+  options:
+    alternative_names:
+    - 192.168.1.20
+    ca: default_ca
+    common_name: 192.168.1.20
+  type: certificate
+- name: credhub_cli_user_password
+  type: password
+- name: credhub_ca
+  options:
+    common_name: CredHub CA
+    is_ca: true
+  type: certificate
+- name: credhub_tls
+  options:
+    alternative_names:
+    - 192.168.1.20
+    ca: credhub_ca
+    common_name: 192.168.1.20
+  type: certificate
+- name: credhub_encryption_password
+  type: password
+- name: uaa_clients_director_to_credhub
+  type: password
+- name: credhub_admin_client_secret
+  type: password
+- name: jumpbox_ssh
+  type: ssh
+- name: vbox_ssh
+  type: ssh

@@ -1,0 +1,6 @@
+tmp/
+secret.yml
+state.json
+ca_certs/
+vars.yml
+vendor/

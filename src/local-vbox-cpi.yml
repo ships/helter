@@ -1,0 +1,7 @@
+- type: replace
+  path: /releases/name=bosh-virtualbox-cpi
+  value:
+    name: bosh-virtualbox-cpi
+    url: file:///home/horse/helter/src/vbox-release-wip.tgz
+
+

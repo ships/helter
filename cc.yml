@@ -1,0 +1,61 @@
+azs:
+- name: z1
+- name: z2
+- name: z3
+compilation:
+  az: z1
+  network: bridge
+  reuse_compilation_vms: true
+  vm_type: default
+  workers: 2
+disk_types:
+- disk_size: 3000
+  name: default
+- disk_size: 50000
+  name: large
+networks:
+- name: bridge
+  subnets:
+  - azs:
+    - z1
+    cloud_properties:
+      name: eno1
+      type: bridged
+    dns:
+    - 8.8.8.8
+    gateway: 192.168.1.254
+    range: 192.168.1.0/24
+    static:
+    - 192.168.1.36
+    - 192.168.1.37
+    - 192.168.1.38
+    reserved:
+    - 192.168.1.0-192.168.1.22
+    - 192.168.1.60-192.168.1.255
+  type: manual
+- subnets:
+  - azs:
+    - z1
+    cloud_properties:
+      name: NatNetwork
+      type: natnetwork
+    dns:
+    - 8.8.8.8
+  name: outbound
+  type: dynamic
+vm_types:
+- cloud_properties:
+    cpus: 2
+    ephemeral_disk: 3240
+    memory: 1024
+  name: default
+- cloud_properties:
+    cpus: 2
+    ephemeral_disk: 30240
+    memory: 4096
+  name: large
+- name: hart
+  cloud_properties:
+    cpus: 2
+    ephemeral_disk: 3240
+    memory: 512
