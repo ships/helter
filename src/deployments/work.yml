@@ -67,7 +67,6 @@ instance_groups:
       consul_servers: { from: consul, deployment: raft }
   vm_type: large
   stemcell: default
-  persistent_disk: 102400
   networks:
   - name: bridge
 

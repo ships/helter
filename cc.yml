@@ -50,12 +50,12 @@ vm_types:
     memory: 1024
   name: default
 - cloud_properties:
-    cpus: 2
-    ephemeral_disk: 30240
-    memory: 4096
+    cpus: 4
+    ephemeral_disk: 130240
+    memory: 6144
   name: large
 - name: hart
   cloud_properties:
     cpus: 2
     ephemeral_disk: 3240
-    memory: 512
+    memory: 256
