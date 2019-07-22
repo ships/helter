@@ -41,6 +41,7 @@ instance_groups:
         vault:
           address: https://active.vault.service.skelter:443
           token: ((nomad_vault_boot_token))
+          create_from_role: nomad-cluster
           ssl_ca: ((nomad_vault_client_tls.ca))
           ssl_cert: ((nomad_vault_client_tls.certificate))
           ssl_key: ((nomad_vault_client_tls.private_key))
