@@ -40,7 +40,7 @@ instance_groups:
         # ssl_key: ((nomad_tls.private_key))
         vault:
           address: https://active.vault.service.skelter:443
-          token: ((/secret/safe/root_token))
+          token: ((nomad_vault_boot_token))
           ssl_ca: ((nomad_vault_client_tls.ca))
           ssl_cert: ((nomad_vault_client_tls.certificate))
           ssl_key: ((nomad_vault_client_tls.private_key))
@@ -112,5 +112,8 @@ variables:
     common_name: Nomad connecting to Consul as client
     ca: /pki/mtls_cas/consul_ca
 
+  # hazard: use a var flag rather than credhub, as these tend to expire
+- name: nomad_vault_boot_token
+  type: value
 
 
