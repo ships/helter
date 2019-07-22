@@ -33,6 +33,7 @@ instance_groups:
       nomad_servers: {from: nomad, deployment: raft}
     properties:
       nomad:
+        persist_data_dir: false
         encrypt: ((/bosh-lite/raft/nomad_encryption_key))
         datacenter: carthage
         region: yao
