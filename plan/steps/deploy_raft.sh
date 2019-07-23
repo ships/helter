@@ -7,6 +7,6 @@ pushd "${repo_root}"
   bosh deploy     src/deployments/raft.yml \
                   -d raft \
                   -l tmp/secrets/nomad-vault-token.yml \
-                  -n
+                  $@
 
 popd
