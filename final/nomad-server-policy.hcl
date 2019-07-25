@@ -39,3 +39,7 @@ path "sys/capabilities-self" {
 path "auth/token/renew-self" {
   capabilities = ["update"]
 }
+
+path "pki/issue/skelter-services" {
+  capabilities = ["read","create","update","list","delete"]
+}
