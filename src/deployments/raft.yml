@@ -23,8 +23,6 @@ instance_groups:
   azs: [z1]
   instances: 3
   jobs:
-  - name: hashi-ui
-    release: nomad
   - name: nomad-server
     release: nomad
     provides:
